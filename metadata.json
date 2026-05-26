@@ -1,0 +1,6 @@
+{
+  "name": "ReClip",
+  "description": "A private, self-hosted video extraction tool for builders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

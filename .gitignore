@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+ENV/
+
+# OS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Settings
+.env
+.env.local
+
+# Download temps
+reclip_*/
