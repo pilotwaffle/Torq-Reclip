@@ -19,3 +19,18 @@ ENV/
 
 # Download temps
 reclip_*/
+
+# Logs
+*.log
+
+# Pip bootstrap (should never be committed; venv ships pip)
+get-pip.py
+
+# yt-dlp cookie jar (sensitive; written by /api/cookies)
+cookies.txt
+
+# Build output
+dist/
+
+# Node
+node_modules/
