@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Install ffmpeg and clean up apt cache
 RUN apt-get update && \
