@@ -1,0 +1,53 @@
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    # yt-dlp ships often; group its minor/patch bumps to reduce PR noise
+    groups:
+      yt-dlp:
+        patterns:
+          - yt-dlp
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - javascript
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+      vite-tooling:
+        patterns:
+          - vite
+          - "@vitejs/*"
+          - esbuild
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions

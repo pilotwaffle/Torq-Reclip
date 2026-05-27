@@ -1,0 +1,23 @@
+# Project configuration for Torq-Reclip Python backend.
+# JS/TS tooling lives in package.json + tsconfig.json.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# Conservative starter set. Expand as the codebase grows.
+#   E, W  = pycodestyle
+#   F     = pyflakes (unused imports/vars, undefined names)
+#   I     = isort   (import ordering)
+#   B     = flake8-bugbear (likely bugs)
+#   UP    = pyupgrade (modern syntax)
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = [
+    # Allow long lines in error-message tables / docstrings.
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# parse_ydl_error has long error-pattern strings by design.
+"reclip.py" = ["E501"]
