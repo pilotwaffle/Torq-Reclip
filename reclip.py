@@ -3,13 +3,14 @@ reclip.py
 A private, self-hosted video extraction tool for builders.
 """
 
+import logging
 import os
 import shutil
 import tempfile
 import urllib.parse
-import logging
-from flask import Flask, request, jsonify, Response
+
 import yt_dlp
+from flask import Flask, Response, jsonify, request
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 logging.basicConfig(level=logging.WARNING)
@@ -37,7 +38,7 @@ def parse_ydl_error(e):
         return {"code": "geo_blocked", "status": 404, "title": "Geo-blocked", "message": "This video is not available in your region."}
     if "urlopen error" in raw or "timed out" in raw or "connection" in raw:
         return {"code": "network", "status": 502, "title": "Network error", "message": "Could not connect to the video host."}
-    
+
     first_line = str(e).split('\n')[0].strip()
     return {"code": "unknown", "status": 500, "title": "Something went wrong", "message": first_line}
 
@@ -55,10 +56,10 @@ def build_ydl_opts(fmt='mp4', format_id=None, download=False, temp_dir=None):
             }
         },
     }
-    
+
     browser = os.environ.get('COOKIES_FROM_BROWSER')
     cookie_file = os.environ.get('COOKIES_FILE', 'cookies.txt')
-    
+
     if browser:
         if cookie_file and os.path.exists(cookie_file):
             logger.warning("Both COOKIES_FROM_BROWSER and COOKIES_FILE exist; preferring browser.")
@@ -103,7 +104,7 @@ def api_cookies():
     if request.method == 'GET':
         has_cookies = os.path.exists(cookie_file)
         return jsonify({"hasCookies": has_cookies})
-    
+
     data = request.json or {}
     cookies_text = data.get('cookies')
     if cookies_text is not None:
@@ -120,10 +121,10 @@ def api_info():
     data = request.json or {}
     urls = [str(u).strip() for u in data.get('urls', []) if is_valid_url(str(u))]
     unique_urls = list(dict.fromkeys(urls))[:25] # max 25 URLs, deduplicated natively
-    
+
     results = []
     ydl_opts = build_ydl_opts(download=False)
-    
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         for url in unique_urls:
             try:
@@ -161,7 +162,7 @@ def api_info():
                     'error': err['message'],
                     'raw': str(e)
                 })
-                
+
     return jsonify(results)
 
 @app.route('/api/download', methods=['POST'])
@@ -170,10 +171,10 @@ def api_download():
     url = str(data.get('url', '')).strip()
     fmt = data.get('format', 'mp4')
     format_id = data.get('format_id')
-    
+
     if not is_valid_url(url):
         return jsonify({"error": "Invalid URL"}), 400
-        
+
     temp_dir = tempfile.mkdtemp(prefix='reclip_')
     ydl_opts = build_ydl_opts(fmt=fmt, format_id=format_id, download=True, temp_dir=temp_dir)
 
@@ -183,10 +184,10 @@ def api_download():
             dl_files = os.listdir(temp_dir)
             if not dl_files:
                 raise Exception("Download failed: No output file produced.")
-                
+
             filename = dl_files[0]
             filepath = os.path.join(temp_dir, filename)
-            
+
             def generate():
                 try:
                     with open(filepath, 'rb') as f:
@@ -194,7 +195,7 @@ def api_download():
                             yield chunk
                 finally:
                     shutil.rmtree(temp_dir, ignore_errors=True)
-            
+
             resp = Response(generate(), mimetype='application/octet-stream')
             encoded_name = filename.encode('ascii', 'ignore').decode('ascii') or f"download.{'mp3' if fmt == 'mp3' else 'mp4'}"
             resp.headers.set('Content-Disposition', f'attachment; filename="{encoded_name}"')
