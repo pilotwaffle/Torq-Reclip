@@ -12,4 +12,5 @@
 # the pins below. Dependabot will open PRs against requirements.txt directly.
 
 flask==3.1.3
+Flask-Limiter==3.8.0
 yt-dlp==2026.3.17

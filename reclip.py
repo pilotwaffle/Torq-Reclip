@@ -3,18 +3,57 @@ reclip.py
 A private, self-hosted video extraction tool for builders.
 """
 
+import ipaddress
 import logging
 import os
+import re
 import shutil
+import socket
 import tempfile
 import urllib.parse
+from functools import wraps
 
 import yt_dlp
 from flask import Flask, Response, jsonify, request
 
+# yt-dlp format ids are short tokens — digits, letters, +, -, _, /.
+# Cap length to defeat pathological selector strings.
+_FORMAT_ID_RE = re.compile(r'^[A-Za-z0-9+\-_/]{1,64}$')
+
 app = Flask(__name__, static_folder='.', static_url_path='')
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
+_AUTH_TOKEN = os.environ.get('RECLIP_AUTH_TOKEN')
+
+
+def require_auth(view):
+    """Bearer-token guard. Disabled (open) if RECLIP_AUTH_TOKEN unset."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not _AUTH_TOKEN:
+            return view(*args, **kwargs)
+        header = request.headers.get('Authorization', '')
+        if not header.startswith('Bearer '):
+            return jsonify({"error": "Unauthorized"}), 401
+        token = header[len('Bearer '):].strip()
+        # constant-time compare to avoid timing oracles
+        import hmac
+        if not hmac.compare_digest(token, _AUTH_TOKEN):
+            return jsonify({"error": "Unauthorized"}), 401
+        return view(*args, **kwargs)
+    return wrapped
+
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],  # opt-in per-route, no global default
+)
+
 
 # Add local ffmpeg directly to PATH if available to support merging A/V
 ffmpeg_path = os.path.join(os.getcwd(), 'node_modules', 'ffmpeg-static')
@@ -86,19 +125,50 @@ def build_ydl_opts(fmt='mp4', format_id=None, download=False, temp_dir=None):
 
     return opts
 
-def is_valid_url(url):
+def _is_safe_remote_url(url):
+    """Reject URLs that resolve to private, loopback, link-local,
+    multicast, or reserved address space. Defeats SSRF via DNS."""
     try:
         url = url.strip()
         parsed = urllib.parse.urlparse(url)
-        return parsed.scheme in ('http', 'https')
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        host = parsed.hostname
+        if not host:
+            return False
+        # getaddrinfo returns all A/AAAA records — reject if ANY is unsafe
+        infos = socket.getaddrinfo(host, None)
+        for family, _type, _proto, _canon, sockaddr in infos:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_multicast or ip.is_reserved
+                    or ip.is_unspecified):
+                return False
+        return True
     except Exception:
         return False
+
+
+def is_valid_url(url):
+    return _is_safe_remote_url(url)
+
+
+def is_valid_format_id(format_id):
+    """Regex floor for format_id before it reaches yt-dlp selector."""
+    if format_id is None:
+        return True  # None means "use default selector"
+    if not isinstance(format_id, str):
+        return False
+    return bool(_FORMAT_ID_RE.match(format_id))
 
 @app.route('/')
 def index():
     return app.send_static_file('index.html')
 
 @app.route('/api/cookies', methods=['POST', 'GET'])
+@require_auth
+@limiter.limit("12/hour", methods=['POST'])
 def api_cookies():
     cookie_file = os.environ.get('COOKIES_FILE', 'cookies.txt')
     if request.method == 'GET':
@@ -117,6 +187,8 @@ def api_cookies():
     return jsonify({"error": "No cookies provided"}), 400
 
 @app.route('/api/info', methods=['POST'])
+@require_auth
+@limiter.limit("30/minute")
 def api_info():
     data = request.json or {}
     urls = [str(u).strip() for u in data.get('urls', []) if is_valid_url(str(u))]
@@ -166,6 +238,8 @@ def api_info():
     return jsonify(results)
 
 @app.route('/api/download', methods=['POST'])
+@require_auth
+@limiter.limit("6/minute")
 def api_download():
     data = request.json or {}
     url = str(data.get('url', '')).strip()
@@ -174,6 +248,9 @@ def api_download():
 
     if not is_valid_url(url):
         return jsonify({"error": "Invalid URL"}), 400
+
+    if not is_valid_format_id(format_id):
+        return jsonify({"error": "Invalid format_id"}), 400
 
     temp_dir = tempfile.mkdtemp(prefix='reclip_')
     ydl_opts = build_ydl_opts(fmt=fmt, format_id=format_id, download=True, temp_dir=temp_dir)
@@ -213,4 +290,6 @@ def api_download():
         return jsonify(err), status_code
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8899)
+    host = os.environ.get('RECLIP_BIND_HOST', '127.0.0.1')
+    port = int(os.environ.get('RECLIP_PORT', '8899'))
+    app.run(host=host, port=port)
