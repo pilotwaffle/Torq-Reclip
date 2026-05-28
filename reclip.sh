@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Starting ReClip setup..."
+echo "⚠️  This script (reclip.sh) is legacy and targets the old vanilla HTML UI."
+echo "    For the current React + Flask development experience, use: ./dev.sh"
+echo ""
+echo "Starting legacy ReClip setup (Flask only on port 8899)..."
 
 # Check Python 3
 if ! command -v python3 &> /dev/null; then

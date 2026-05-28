@@ -2,11 +2,15 @@
 #
 # dev.sh — local development bootstrap for Torq-Reclip
 #
+# This is the primary development command for the current architecture:
+#   - Python Flask backend (reclip.py) on port 8899 (yt-dlp + ffmpeg)
+#   - React + Vite frontend on port 3000 (with /api proxy to backend)
+#
 # Usage:
 #   ./dev.sh           # incremental: reuse existing .venv if present
 #   ./dev.sh --clean   # destructive: rm -rf .venv and rebuild from scratch
 #
-# Starts the Flask backend (reclip.py) in the background and Vite on :3000.
+# Note: The legacy reclip.sh script is outdated and targets the old vanilla HTML version.
 
 set -euo pipefail
 
