@@ -15,6 +15,8 @@ from functools import wraps
 
 import yt_dlp
 from flask import Flask, Response, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # yt-dlp format ids are short tokens — digits, letters, +, -, _, /.
 # Cap length to defeat pathological selector strings.
@@ -63,9 +65,6 @@ def require_auth(view):
         return view(*args, **kwargs)
     return wrapped
 
-
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -160,7 +159,7 @@ def _is_safe_remote_url(url):
             return False
         # getaddrinfo returns all A/AAAA records — reject if ANY is unsafe
         infos = socket.getaddrinfo(host, None)
-        for family, _type, _proto, _canon, sockaddr in infos:
+        for _family, _type, _proto, _canon, sockaddr in infos:
             ip_str = sockaddr[0]
             ip = ipaddress.ip_address(ip_str)
             if (ip.is_private or ip.is_loopback or ip.is_link_local
