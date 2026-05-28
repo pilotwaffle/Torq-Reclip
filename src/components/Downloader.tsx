@@ -24,7 +24,13 @@ export function Downloader() {
   const [cookieText, setCookieText] = useState('');
   const [savingCookies, setSavingCookies] = useState(false);
 
+  // Guard against double execution in React StrictMode (dev) and multiple mounts
+  const cookiesFetched = useRef(false);
+
   useEffect(() => {
+    if (cookiesFetched.current) return;
+    cookiesFetched.current = true;
+
     fetch('/api/cookies')
       .then(r => r.json())
       .then(d => setHasCookies(!!d.hasCookies))

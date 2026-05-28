@@ -21,8 +21,27 @@ from flask import Flask, Response, jsonify, request
 _FORMAT_ID_RE = re.compile(r'^[A-Za-z0-9+\-_/]{1,64}$')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-logging.basicConfig(level=logging.WARNING)
+
+# --- Production-friendly logging setup ---
+log_level = os.environ.get('RECLIP_LOG_LEVEL', 'INFO').upper()
+log_file = os.environ.get('RECLIP_LOG_FILE', 'reclip.log')
+
+# Root logger configuration
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file, encoding='utf-8')
+    ]
+)
+
 logger = logging.getLogger(__name__)
+
+# Reduce noise from third-party libraries
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('yt_dlp').setLevel(logging.WARNING)
+# --------------------------------------------------
 
 _AUTH_TOKEN = os.environ.get('RECLIP_AUTH_TOKEN')
 
@@ -85,6 +104,7 @@ def build_ydl_opts(fmt='mp4', format_id=None, download=False, temp_dir=None):
     opts = {
         'quiet': True,
         'no_warnings': True,
+        'noprogress': True,           # Suppress progress bars in server mode
         'noplaylist': True,
         'extractor_retries': 3,
         'retries': 3,
@@ -94,6 +114,8 @@ def build_ydl_opts(fmt='mp4', format_id=None, download=False, temp_dir=None):
                 'player_client': ['android', 'ios']
             }
         },
+        # Prevent yt-dlp from spamming stdout with progress hooks
+        'progress_hooks': [],
     }
 
     browser = os.environ.get('COOKIES_FROM_BROWSER')
